@@ -36,6 +36,19 @@ def test_high_severity_issue_drives_score_down():
     assert risk["level"] in ("medium", "high")
 
 
+def test_removing_all_exception_handling_blocks_autofix():
+    # Fix strips the try/except entirely — should not be auto-applied.
+    original = "def load(path):\n    try:\n        return open(path).read()\n    except:\n        return None\n"
+    fixed = "def load(path):\n    return open(path).read()\n"
+    risk = assess_risk(
+        original_code=original,
+        fixed_code=fixed,
+        issues=[{"type": "Reliability", "severity": "Low", "msg": "bare except"}],
+    )
+    assert risk["should_autofix"] is False
+    assert any("exception handling" in r.lower() for r in risk["reasons"])
+
+
 def test_missing_return_is_penalized():
     original = "def f(x):\n    return x + 1\n"
     fixed = "def f(x):\n    x + 1\n"

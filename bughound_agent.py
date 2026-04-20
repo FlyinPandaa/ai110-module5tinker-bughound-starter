@@ -1,8 +1,16 @@
 import json
+import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from reliability.risk_assessor import assess_risk
+
+_PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
+
+
+def _load_prompt(filename: str) -> str:
+    with open(os.path.join(_PROMPTS_DIR, filename), encoding="utf-8") as f:
+        return f.read()
 
 
 class BugHoundAgent:
@@ -59,15 +67,8 @@ class BugHoundAgent:
             return self._heuristic_analyze(code_snippet)
 
         self._log("ANALYZE", "Using LLM analyzer.")
-        system_prompt = (
-            "You are BugHound, a code review assistant. "
-            "Return ONLY valid JSON. No markdown, no backticks."
-        )
-        user_prompt = (
-            "Analyze this Python code for potential issues. "
-            "Return a JSON array of issue objects with keys: type, severity, msg.\n\n"
-            f"CODE:\n{code_snippet}"
-        )
+        system_prompt = _load_prompt("analyzer_system.txt")
+        user_prompt = _load_prompt("analyzer_user.txt").replace("{{CODE}}", code_snippet)
 
         # UPDATED: Added exception handling for API errors/rate limits
         try:
@@ -94,15 +95,11 @@ class BugHoundAgent:
             return self._heuristic_fix(code_snippet, issues)
 
         self._log("ACT", "Using LLM fixer.")
-        system_prompt = (
-            "You are BugHound, a careful refactoring assistant. "
-            "Return ONLY the full rewritten Python code. No markdown, no backticks."
-        )
+        system_prompt = _load_prompt("fixer_system.txt")
         user_prompt = (
-            "Rewrite the code to address the issues listed. "
-            "Preserve behavior when possible. Keep changes minimal.\n\n"
-            f"ISSUES (JSON):\n{json.dumps(issues)}\n\n"
-            f"CODE:\n{code_snippet}"
+            _load_prompt("fixer_user.txt")
+            .replace("{{ISSUES}}", json.dumps(issues))
+            .replace("{{CODE}}", code_snippet)
         )
 
         # UPDATED: Added exception handling for API errors/rate limits
@@ -185,15 +182,21 @@ class BugHoundAgent:
 
         return None
 
+    _VALID_SEVERITIES = {"Low", "Medium", "High"}
+
     def _normalize_issues(self, arr: List[Any]) -> List[Dict[str, str]]:
         issues: List[Dict[str, str]] = []
         for item in arr:
             if not isinstance(item, dict):
                 continue
+            severity = str(item.get("severity", "")).strip().capitalize()
+            if severity not in self._VALID_SEVERITIES:
+                self._log("ANALYZE", f"Skipping issue with unrecognized severity '{severity}'.")
+                continue
             issues.append(
                 {
                     "type": str(item.get("type", "Issue")),
-                    "severity": str(item.get("severity", "Unknown")),
+                    "severity": severity,
                     "msg": str(item.get("msg", "")).strip(),
                 }
             )

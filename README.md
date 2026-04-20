@@ -107,3 +107,7 @@ You should see tests covering:
 * Risk scoring and guardrails
 * Heuristic fallbacks when LLM output is invalid
 * End-to-end agent workflow shape
+
+## TF Summary
+
+Bughound demonstrates that AI agents is code that calls a model, checks the response, and decides what to do next. The agent has to valuidate what the model returns before  trusting it. The fallback logic is where students often don't realize the agent is silently switing to heuristics when the model returns a bad output. Gemini caught issues that the rule-based syustem completely missed, like the vague variable names or missing edge cases. Gemini from time to time, rewrote far more code that what was necessary, which made the code harder to review for differences. A good question to guide students for this tinker activity is, " How does the agent know whether to trust what th model said?".

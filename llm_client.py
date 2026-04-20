@@ -21,7 +21,7 @@ class GeminiClient:
     Minimal Gemini API wrapper with added error resilience.
 
     Requirements:
-    - google-generativeai installed
+    - google-genai installed
     - GEMINI_API_KEY set in environment (or loaded via python-dotenv)
     """
 
@@ -33,10 +33,12 @@ class GeminiClient:
             )
 
         # Import here so heuristic mode doesn't require the dependency at import time.
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
 
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(model_name)
+        self._types = types
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = model_name
         self.temperature = float(temperature)
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
@@ -44,22 +46,19 @@ class GeminiClient:
         Sends a single request to Gemini.
 
         UPDATED: Added try/except to handle rate limits and API errors gracefully.
-        If an error occurs, it returns an empty string, triggering the agent's 
+        If an error occurs, it returns an empty string, triggering the agent's
         heuristic fallback logic.
         """
         try:
-            response = self.model.generate_content(
-                [
-                    {"role": "system", "parts": [system_prompt]},
-                    {"role": "user", "parts": [user_prompt]},
-                ],
-                generation_config={"temperature": self.temperature},
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=user_prompt,
+                config=self._types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=self.temperature,
+                ),
             )
-
-            # Defensive: response.text can be None or raise an error if blocked by filters.
             return response.text or ""
-            
+
         except Exception as e:
-            # Returning empty string allows the agent to detect the failure 
-            # and switch to offline rules.
             return ""

@@ -62,6 +62,10 @@ def assess_risk(
         score -= 5
         reasons.append("Bare except was modified, verify correctness.")
 
+    if "try:" in original_code and "try:" not in fixed_code:
+        score -= 25
+        reasons.append("All exception handling (try/except) was removed. High risk of unhandled errors.")
+
     # ----------------------------
     # Clamp score
     # ----------------------------
